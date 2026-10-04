@@ -48,4 +48,8 @@ func gameRunning() (bool, error) {
 	return false, nil
 }
 
-func launchedFromExplorer() bool { return false }
+const guiAvailable = false
+
+func runGUI(minimized bool) int { return 1 }
+
+func attachConsole() {}

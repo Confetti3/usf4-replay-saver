@@ -3,7 +3,7 @@
 package main
 
 import (
-	"bufio"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -14,13 +14,16 @@ import (
 var version = "dev"
 
 func main() {
-	code := run()
-	if launchedFromExplorer() {
-		fmt.Println()
-		fmt.Print("Press Enter to close this window.")
-		bufio.NewReader(os.Stdin).ReadString('\n')
+	// Started with no arguments on Windows (a double-click), it opens the
+	// window. Any argument runs the command line version.
+	if len(os.Args) == 1 && guiAvailable {
+		os.Exit(runGUI(false))
 	}
-	os.Exit(code)
+	if len(os.Args) == 2 && os.Args[1] == "-minimized" && guiAvailable {
+		os.Exit(runGUI(true))
+	}
+	attachConsole()
+	os.Exit(run())
 }
 
 func run() int {
@@ -66,7 +69,18 @@ func run() int {
 			}
 			return 1
 		}
-		return report(restore(*restoreFile, dirs[0], a))
+		slot, err := restore(*restoreFile, dirs[0], a)
+		if err != nil {
+			return report(err)
+		}
+		if slot < 0 {
+			fmt.Println("That replay is already in the game's recent matches. Nothing to do.")
+			return 0
+		}
+		fmt.Printf("Restored into slot %d of %s\n", slot, dirs[0])
+		fmt.Println("Open the game and find it with your recent matches. Save it in the game if you want")
+		fmt.Println("to keep it there, because your next match may overwrite it.")
+		return 0
 	}
 
 	fmt.Printf("usf4-replay-saver %s\n", version)
@@ -84,7 +98,7 @@ func run() int {
 		return report(err)
 	}
 	printSaved(result.saved)
-	fmt.Printf("%d replays in the folder.\n", len(a.known))
+	fmt.Printf("%d replays in the folder.\n", a.count())
 	if *once {
 		return 0
 	}
@@ -119,6 +133,10 @@ func printSaved(names []string) {
 
 func report(err error) int {
 	if err != nil {
+		if errors.Is(err, errGameRunning) {
+			fmt.Println("Close Street Fighter IV first, then try again.")
+			return 1
+		}
 		fmt.Println("Error: " + err.Error())
 		return 1
 	}

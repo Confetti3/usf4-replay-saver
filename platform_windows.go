@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"unsafe"
 
 	"golang.org/x/sys/windows/registry"
 )
@@ -59,12 +58,29 @@ func gameRunning() (bool, error) {
 	return strings.Contains(strings.ToLower(string(out)), "ssfiv.exe"), nil
 }
 
-// launchedFromExplorer reports whether the tool owns its console window,
-// which is the case when someone double-clicks the exe.
-func launchedFromExplorer() bool {
+// attachConsole connects a windowsgui build to the console it was started
+// from, so the command line version can print. Output that is already
+// redirected to a file or pipe is left as it is.
+func attachConsole() {
+	if hasStdout() {
+		return
+	}
 	kernel32 := syscall.NewLazyDLL("kernel32.dll")
-	proc := kernel32.NewProc("GetConsoleProcessList")
-	pids := make([]uint32, 4)
-	n, _, _ := proc.Call(uintptr(unsafe.Pointer(&pids[0])), uintptr(len(pids)))
-	return n == 1
+	const attachParentProcess = ^uintptr(0)
+	if r, _, _ := kernel32.NewProc("AttachConsole").Call(attachParentProcess); r == 0 {
+		return
+	}
+	if f, err := os.OpenFile("CONOUT$", os.O_WRONLY, 0); err == nil {
+		os.Stdout = f
+		os.Stderr = f
+	}
+}
+
+func hasStdout() bool {
+	h, err := syscall.GetStdHandle(syscall.STD_OUTPUT_HANDLE)
+	if err != nil || h == syscall.InvalidHandle || h == 0 {
+		return false
+	}
+	t, err := syscall.GetFileType(h)
+	return err == nil && t != 0 // FILE_TYPE_UNKNOWN
 }

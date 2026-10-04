@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>USF4 Replay Saver</title>
+<style>
+:root {
+  --bg: #f4f4f6;
+  --card: #ffffff;
+  --text: #1b1b1f;
+  --muted: #6a6a73;
+  --line: #e3e3e8;
+  --accent: #d9381e;
+  --accent-text: #ffffff;
+  --accent-soft: #fde9e5;
+  --good: #1f9d55;
+  --good-soft: #e3f5ea;
+  --warn: #c27c0e;
+  --warn-soft: #fbf0db;
+  --button: #ececf0;
+  --button-hover: #e0e0e6;
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17171a;
+    --card: #222226;
+    --text: #f1f1f3;
+    --muted: #a0a0aa;
+    --line: #333339;
+    --accent: #ff5a3c;
+    --accent-text: #ffffff;
+    --accent-soft: #3a211c;
+    --good: #3ccf7a;
+    --good-soft: #1b3326;
+    --warn: #f0b24a;
+    --warn-soft: #3a2f1a;
+    --button: #303036;
+    --button-hover: #3a3a41;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+  -webkit-user-select: none;
+}
+main { flex: 1; overflow-y: auto; padding: 20px 22px 8px; }
+h1 { font-size: 20px; font-weight: 650; margin: 0 0 14px; letter-spacing: -.01em; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: var(--shadow);
+}
+.status { display: flex; gap: 14px; align-items: flex-start; }
+.dot {
+  flex: none; width: 12px; height: 12px; border-radius: 50%; margin-top: 6px;
+  background: var(--good); box-shadow: 0 0 0 5px var(--good-soft);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+.dot.warn { background: var(--warn); box-shadow: 0 0 0 5px var(--warn-soft); animation: none; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 8px var(--good-soft); } }
+@media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+.status-title { font-size: 17px; font-weight: 600; }
+.status-text { color: var(--muted); margin-top: 2px; }
+.status-actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+.path { font-size: 12.5px; color: var(--muted); margin-top: 10px; word-break: break-all; user-select: text; -webkit-user-select: text; }
+
+button {
+  font: inherit; font-size: 14px; font-weight: 600;
+  border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer;
+  background: var(--button); color: var(--text);
+  white-space: nowrap; flex: none;
+}
+button:hover { background: var(--button-hover); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: var(--accent-text); }
+button.primary:hover { filter: brightness(1.08); }
+button.link { background: none; color: var(--muted); padding: 6px 8px; font-weight: 500; }
+button.link:hover { color: var(--text); background: var(--button); }
+button:disabled { opacity: .55; cursor: default; }
+
+input[type=text] {
+  flex: 1; min-width: 0; font: inherit; font-size: 14px;
+  padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--text);
+  user-select: text; -webkit-user-select: text;
+}
+.row-input { display: flex; gap: 8px; margin-top: 12px; }
+
+.list-head { display: flex; align-items: baseline; justify-content: space-between; margin: 24px 2px 6px; }
+.list-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
+.count { color: var(--muted); font-size: 13px; }
+.day { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 16px 4px 6px; }
+.list { padding: 4px 0; }
+.item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px 8px 16px; border-top: 1px solid var(--line);
+}
+.item:first-child { border-top: 0; }
+.time { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 78px; }
+.badge {
+  font-size: 11.5px; font-weight: 700; color: var(--accent);
+  background: var(--accent-soft); border-radius: 99px; padding: 1px 8px;
+}
+.spacer { flex: 1; }
+.empty { text-align: center; color: var(--muted); padding: 28px 16px; }
+
+footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 22px 14px; border-top: 1px solid var(--line); background: var(--bg);
+  font-size: 13.5px;
+}
+footer label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+footer input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+.version { color: var(--muted); font-size: 12px; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 70px; transform: translate(-50%, 20px);
+  max-width: calc(100% - 40px); width: max-content;
+  background: var(--text); color: var(--bg); border-radius: 10px; padding: 10px 16px;
+  font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+.overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.4);
+  display: none; align-items: center; justify-content: center; padding: 20px;
+}
+.overlay.show { display: flex; }
+.dialog { max-width: 400px; width: 100%; }
+.dialog h3 { margin: 0 0 8px; font-size: 17px; }
+.dialog p { margin: 0 0 10px; color: var(--muted); }
+.dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>USF4 Replay Saver</h1>
+  <section class="card" id="status"></section>
+  <div class="list-head">
+    <h2>Your replays</h2>
+    <span class="count" id="count"></span>
+  </div>
+  <div id="replays"></div>
+</main>
+<footer>
+  <label><input type="checkbox" id="startup"> Start with Windows</label>
+  <span class="version" id="version"></span>
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="overlay" id="confirm">
+  <div class="card dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <h3 id="confirm-title">Watch this replay in the game?</h3>
+    <p>This puts the replay back with the game's recent replays. Close Street Fighter IV first if it is open.</p>
+    <p>It takes the place of your oldest recent replay, which is already saved here.</p>
+    <div class="actions">
+      <button id="confirm-cancel">Cancel</button>
+      <button class="primary" id="confirm-ok">Put it in the game</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let pending = null;
+let toastTimer = null;
+
+function el(tag, props, ...children) {
+  const node = document.createElement(tag);
+  Object.assign(node, props || {});
+  for (const child of children) node.append(child);
+  return node;
+}
+
+function toast(text) {
+  const t = $("toast");
+  t.textContent = text;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 6000);
+}
+
+function dayLabel(date) {
+  const start = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((start(new Date()) - start(date)) / 86400000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return date.toLocaleDateString(undefined, sameYear
+    ? { weekday: "long", month: "long", day: "numeric" }
+    : { year: "numeric", month: "long", day: "numeric" });
+}
+
+function renderStatus(state) {
+  const box = $("status");
+  box.replaceChildren();
+  if (state.found) {
+    const open = el("button", { className: "primary", textContent: "Open replays folder", onclick: () => openFolder() });
+    box.append(el("div", { className: "status" },
+      el("span", { className: "dot" }),
+      el("div", {},
+        el("div", { className: "status-title", textContent: "Saving your replays" }),
+        el("div", { className: "status-text", textContent: "Leave this window open while you play. Every match is saved here automatically." }),
+        el("div", { className: "status-actions" }, open))));
+    return;
+  }
+  const input = el("input", { type: "text", id: "folder", placeholder: "Paste the SSF4_SaveData folder here" });
+  const use = el("button", { className: "primary", textContent: "Use this folder" });
+  use.onclick = async () => {
+    const result = await setSaveDir(input.value);
+    if (result.ok) { toast("Got it. Your replays will be saved from now on."); refresh(); }
+    else toast(result.message);
+  };
+  input.onkeydown = (e) => { if (e.key === "Enter") use.click(); };
+  box.append(el("div", { className: "status" },
+    el("span", { className: "dot warn" }),
+    el("div", { style: "flex:1;min-width:0" },
+      el("div", { className: "status-title", textContent: "Waiting for Street Fighter IV" }),
+      el("div", { className: "status-text", textContent: "Play one match and this starts working on its own. If it still says this afterwards, paste your save folder below." }),
+      el("div", { className: "row-input" }, input, use),
+      el("div", { className: "path", textContent: "Usually " + state.expected }))));
+}
+
+function renderReplays(state) {
+  const box = $("replays");
+  box.replaceChildren();
+  const n = state.replays.length;
+  $("count").textContent = n === 1 ? "1 saved" : n + " saved";
+  if (n === 0) {
+    box.append(el("div", { className: "card empty", textContent: "No replays yet. Your next match will show up here." }));
+    return;
+  }
+  let list = null, lastDay = null;
+  for (const replay of state.replays) {
+    const date = new Date(replay.time);
+    const day = dayLabel(date);
+    if (day !== lastDay) {
+      box.append(el("div", { className: "day", textContent: day }));
+      list = el("div", { className: "card list" });
+      box.append(list);
+      lastDay = day;
+    }
+    const row = el("div", { className: "item" },
+      el("span", { className: "time", textContent: date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) }));
+    if (replay.new) row.append(el("span", { className: "badge", textContent: "New" }));
+    row.append(el("span", { className: "spacer" }));
+    row.append(el("button", { className: "link", textContent: "Show file", title: replay.name, onclick: () => showFile(replay.name) }));
+    row.append(el("button", { textContent: "Watch in game", onclick: () => askWatch(replay.name) }));
+    list.append(row);
+  }
+}
+
+function askWatch(name) {
+  pending = name;
+  $("confirm").classList.add("show");
+  $("confirm-ok").focus();
+}
+
+function closeConfirm() {
+  pending = null;
+  $("confirm").classList.remove("show");
+}
+
+$("confirm-cancel").onclick = closeConfirm;
+$("confirm").onclick = (e) => { if (e.target === $("confirm")) closeConfirm(); };
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeConfirm(); });
+$("confirm-ok").onclick = async () => {
+  const name = pending;
+  closeConfirm();
+  if (!name) return;
+  const result = await watchInGame(name);
+  toast(result.message);
+  refresh();
+};
+
+$("startup").onchange = async (e) => {
+  const result = await setStartup(e.target.checked);
+  if (!result.ok) { toast(result.message); refresh(); }
+  else toast(e.target.checked ? "It will start with Windows from now on." : "It will no longer start with Windows.");
+};
+
+let lastState = "";
+async function refresh() {
+  const state = await getState();
+  // Redrawing only on a change keeps focus and typed text in place.
+  const key = JSON.stringify(state) + new Date().toDateString();
+  if (key === lastState) return;
+  lastState = key;
+  renderStatus(state);
+  renderReplays(state);
+  $("startup").checked = state.startup;
+  $("version").textContent = state.version;
+}
+window.refresh = refresh;
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

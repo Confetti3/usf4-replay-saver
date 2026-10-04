@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -17,6 +18,7 @@ var archivedName = regexp.MustCompile(`_([0-9a-f]{8})\` + replayExt + `$`)
 
 type archive struct {
 	dir   string
+	mu    sync.Mutex
 	known map[uint32]string // CRC to file name
 }
 
@@ -42,14 +44,17 @@ func openArchive(dir string) (*archive, error) {
 	return a, nil
 }
 
-func (a *archive) has(crc uint32) bool {
-	_, ok := a.known[crc]
-	return ok
+func (a *archive) count() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return len(a.known)
 }
 
 // save copies a replay into the archive unless an identical one is there.
 // It returns the file name and whether it wrote a new file.
 func (a *archive) save(s *slot) (string, bool, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	if name, ok := a.known[s.crc]; ok {
 		return name, false, nil
 	}

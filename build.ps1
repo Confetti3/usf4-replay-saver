@@ -17,7 +17,9 @@ foreach ($t in $targets) {
     New-Item -ItemType Directory $stage | Out-Null
     $env:GOOS = $t.os
     $env:GOARCH = $t.arch
-    go build -trimpath -ldflags "-s -w -X main.version=$Version" -o (Join-Path $stage $t.exe) .
+    $ldflags = "-s -w -X main.version=$Version"
+    if ($t.os -eq 'windows') { $ldflags += ' -H windowsgui' }
+    go build -trimpath -ldflags $ldflags -o (Join-Path $stage $t.exe) .
     if ($LASTEXITCODE -ne 0) { throw "build failed for $name" }
     Copy-Item README.md, LICENSE $stage
     if ($t.os -eq 'windows') {

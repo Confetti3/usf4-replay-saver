@@ -11,53 +11,47 @@ import (
 	"time"
 )
 
+var errGameRunning = errors.New("close Street Fighter IV first; the game rewrites its save files while it runs")
+
 // restore puts an archived replay back into the game's recent-match ring so
 // the game can play it. It replaces the oldest ring slot, after making sure
-// that slot is archived first. The game must be closed.
-func restore(file string, dir string, a *archive) error {
-	if running, err := gameRunning(); err != nil {
-		fmt.Printf("Could not check whether the game is running (%v). Make sure it is closed.\n", err)
-	} else if running {
-		return errors.New("close Street Fighter IV first; the game rewrites its save files while it runs")
+// that slot is archived first. The game must be closed. It returns the slot
+// written, or -1 when the replay was already in the ring.
+func restore(file string, dir string, a *archive) (int, error) {
+	if running, err := gameRunning(); err == nil && running {
+		return 0, errGameRunning
 	}
 	data, err := os.ReadFile(file)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if err := validateReplay(data); err != nil {
-		return err
+		return 0, err
 	}
 	crc := crc32.ChecksumIEEE(data)
 
 	target, err := oldestRingSlot(dir, crc)
-	if err != nil {
-		return err
-	}
-	if target < 0 {
-		fmt.Println("That replay is already in the game's recent matches. Nothing to do.")
-		return nil
+	if err != nil || target < 0 {
+		return target, err
 	}
 	if s, err := readSlot(dir, target); err == nil {
 		if _, _, err := a.save(s); err != nil {
-			return fmt.Errorf("could not archive slot %d before replacing it: %w", target, err)
+			return 0, fmt.Errorf("could not archive slot %d before replacing it: %w", target, err)
 		}
 	} else if !errors.Is(err, os.ErrNotExist) && err != errNotReplay {
-		return fmt.Errorf("slot %d could not be read, so it was left alone: %w", target, err)
+		return 0, fmt.Errorf("slot %d could not be read, so it was left alone: %w", target, err)
 	}
 
 	path := filepath.Join(dir, strconv.Itoa(target))
 	if err := writeReplaced(path, data); err != nil {
-		return err
+		return 0, err
 	}
 	sum := make([]byte, 4)
 	binary.LittleEndian.PutUint32(sum, crc)
 	if err := writeReplaced(path+".0", sum); err != nil {
-		return err
+		return 0, err
 	}
-	fmt.Printf("Restored into slot %d of %s\n", target, dir)
-	fmt.Println("Open the game and find it with your recent matches. Save it in the game if you want")
-	fmt.Println("to keep it there, because your next match may overwrite it.")
-	return nil
+	return target, nil
 }
 
 // oldestRingSlot picks the ring slot to replace: an empty or unreadable slot
