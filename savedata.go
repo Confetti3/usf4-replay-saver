@@ -16,7 +16,7 @@ import (
 // USF4 keeps its saves under Steam Cloud as numbered files. Slots 0-299 are
 // the replays a player saved by hand (indexed by the LIST file). Slots
 // 300-309 are a ring the game writes after every match, overwriting the
-// oldest. Each slot N has a sidecar N.0 holding the CRC-32 of N, little endian.
+// one of them in turn. Each slot N has a sidecar N.0 holding the CRC-32 of N, little endian.
 const (
 	appID         = "45760"
 	ringFirst     = 300

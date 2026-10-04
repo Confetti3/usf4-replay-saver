@@ -1,6 +1,6 @@
 # USF4 Replay Saver
 
-Ultra Street Fighter IV on PC keeps only your last 10 matches as replays. Each new match overwrites the oldest one, so after a long session most of your games are gone unless you saved each one by hand in the Replay Channel.
+Ultra Street Fighter IV on PC keeps only your last 10 matches as replays. The game cycles through 10 slots and overwrites one after every match, so after a long session most of your games are gone unless you saved each one by hand in the Replay Channel.
 
 This tool copies every one of those replays into a folder before the game overwrites it. It is a stopgap until Ember Netplay can save replays itself.
 
@@ -28,6 +28,8 @@ usf4-replay-saver.exe -restore "Documents\USF4 Replays\2026-10-03_19-45-35_0cd3a
 
 It puts that replay back among the game's 10 recent matches, in place of the oldest one (which it copies first, so nothing is lost). Start the game and find it with your recent replays. Your next match may overwrite it again, so save it in the game if you want it to stay there.
 
+Steam uploads the changed save the next time you start the game. If Steam ever shows a Cloud conflict for USF4 after a restore, keep the local files.
+
 ## Options
 
 | Option | What it does |
@@ -54,7 +56,7 @@ Download the `linux-amd64` archive and run `./usf4-replay-saver` in a terminal. 
 
 The game keeps its saves in Steam Cloud, in `Steam\userdata\<id>\45760\remote\CAPCOM\SUPERSTREETFIGHTERIV\SSF4_SaveData`. Every save is a numbered file with a small `N.0` file beside it that holds the CRC-32 of the save.
 
-- Files `300` to `309` hold the last 10 matches. The game rewrites the oldest one after each match.
+- Files `300` to `309` hold the last 10 matches. The game cycles through them, rewriting one after each match.
 - Files `0` to `299` hold replays you saved by hand from the Replay Channel. A file called `LIST` indexes them.
 - Every replay starts with `#BRP` and carries the time it was recorded at byte 16.
 
