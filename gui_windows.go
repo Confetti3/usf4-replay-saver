@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -62,9 +63,10 @@ type gui struct {
 }
 
 type replayInfo struct {
-	Name string `json:"name"`
-	Time int64  `json:"time"` // Unix milliseconds
-	New  bool   `json:"new"`
+	Name     string `json:"name"`
+	Time     int64  `json:"time"` // Unix milliseconds
+	New      bool   `json:"new"`
+	CanWatch bool   `json:"canWatch"` // the game's list entry for it was kept
 }
 
 type guiState struct {
@@ -115,6 +117,7 @@ func runGUI(minimized bool) int {
 		return 1
 	}
 	g.dirs = g.findDirs()
+	g.logDirs(g.dirs)
 	if g.startupEnabled() {
 		g.setStartup(true) // keeps the entry pointing at this copy of the exe
 	}
@@ -231,7 +234,9 @@ func (g *gui) watch(stop <-chan struct{}) {
 	for {
 		g.mu.Lock()
 		if len(g.dirs) == 0 {
-			g.dirs = g.findDirs()
+			if g.dirs = g.findDirs(); len(g.dirs) > 0 {
+				g.logDirs(g.dirs)
+			}
 		}
 		dirs := g.dirs
 		g.mu.Unlock()
@@ -248,7 +253,10 @@ func (g *gui) watch(stop <-chan struct{}) {
 				g.log.Printf("saved %s", name)
 			}
 			g.mu.Unlock()
-			changed = len(result.saved) > 0
+			if result.entries > 0 {
+				g.log.Printf("kept %d list entries", result.entries)
+			}
+			changed = len(result.saved) > 0 || result.entries > 0
 		}
 		if changed && g.view != nil {
 			g.view.Dispatch(func() { g.view.Eval("window.refresh && window.refresh()") })
@@ -295,7 +303,13 @@ func (g *gui) state() guiState {
 				when = info.ModTime()
 			}
 		}
-		s.Replays = append(s.Replays, replayInfo{Name: name, Time: when.UnixMilli(), New: fresh[name]})
+		info := replayInfo{Name: name, Time: when.UnixMilli(), New: fresh[name]}
+		if m := archivedName.FindStringSubmatch(name); m != nil {
+			if crc, err := strconv.ParseUint(m[1], 16, 32); err == nil {
+				info.CanWatch = g.archive.hasEntry(uint32(crc))
+			}
+		}
+		s.Replays = append(s.Replays, info)
 	}
 	sort.Slice(s.Replays, func(i, j int) bool { return s.Replays[i].Time > s.Replays[j].Time })
 	return s
@@ -338,6 +352,8 @@ func (g *gui) watchInGame(name string) actionResult {
 	switch {
 	case errors.Is(err, errGameRunning):
 		return actionResult{Message: "Close Street Fighter IV first, then try again."}
+	case errors.Is(err, errNoEntry):
+		return actionResult{Message: noEntryMessage}
 	case err != nil:
 		g.log.Printf("restore %s: %v", name, err)
 		return actionResult{Message: "That did not work: " + err.Error()}
@@ -346,6 +362,17 @@ func (g *gui) watchInGame(name string) actionResult {
 	}
 	g.log.Printf("restored %s into slot %d of %s", name, slot, dir)
 	return actionResult{OK: true, Message: "Done. Start the game and open your recent replays to watch it."}
+}
+
+const noEntryMessage = "This one was saved by an older version of the app without the details the game needs to list it. Replays saved from now on can be put back."
+
+func (g *gui) logDirs(dirs []string) {
+	if len(dirs) == 0 {
+		g.log.Printf("no save folder found")
+	}
+	for _, dir := range dirs {
+		g.log.Printf("save folder %s", dir)
+	}
 }
 
 // activeSaveDir picks the account that played most recently when more than

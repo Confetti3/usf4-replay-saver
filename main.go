@@ -78,8 +78,8 @@ func run() int {
 			return 0
 		}
 		fmt.Printf("Restored into slot %d of %s\n", slot, dirs[0])
-		fmt.Println("Open the game and find it with your recent matches. Save it in the game if you want")
-		fmt.Println("to keep it there, because your next match may overwrite it.")
+		fmt.Println("Start the game and open your recent replays to watch it. Save it in the game if you")
+		fmt.Println("want to keep it there, because your next match may replace it.")
 		return 0
 	}
 

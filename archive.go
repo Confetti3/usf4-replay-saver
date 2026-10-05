@@ -12,7 +12,11 @@ import (
 	"time"
 )
 
-const replayExt = ".usf4replay"
+const (
+	replayExt = ".usf4replay"
+	// entryDirName holds the game's index entry for each replay, by CRC.
+	entryDirName = ".index"
+)
 
 var archivedName = regexp.MustCompile(`_([0-9a-f]{8})\` + replayExt + `$`)
 
@@ -81,13 +85,20 @@ func (a *archive) save(s *slot) (string, bool, error) {
 
 type scanResult struct {
 	saved   []string
+	entries int // index entries kept, including ones for replays saved earlier
 	waiting int // slots skipped because their checksum did not match yet
 }
 
-// scan archives every finished replay in the given slot range.
+// scan archives every finished replay in the given slot range, with the
+// game's index entry for it so it can be put back later.
 func (a *archive) scan(dirs []string, first, last int) (scanResult, error) {
 	var result scanResult
 	for _, dir := range dirs {
+		ring, _ := readRingIndex(dir)
+		var saved *replayIndex
+		if first < ringFirst {
+			saved, _ = readSavedIndex(dir)
+		}
 		for n := first; n <= last; n++ {
 			s, err := readSlot(dir, n)
 			if err != nil {
@@ -103,9 +114,55 @@ func (a *archive) scan(dirs []string, first, last int) (scanResult, error) {
 			if isNew {
 				result.saved = append(result.saved, name)
 			}
+			// The game rewrites the index just after the replay, so an entry
+			// that does not match yet is picked up on a later scan.
+			idx := ring
+			if n < ringFirst {
+				idx = saved
+			}
+			if idx != nil && !a.hasEntry(s.crc) {
+				if e := idx.entry(n, s.crc); e != nil && validEntry(e, s.crc, len(s.data)) {
+					if err := a.saveEntry(s.crc, e); err != nil {
+						return result, fmt.Errorf("saving the index entry for slot %d: %w", n, err)
+					}
+					result.entries++
+				}
+			}
 		}
 	}
 	return result, nil
+}
+
+func (a *archive) entryPath(crc uint32) string {
+	return filepath.Join(a.dir, entryDirName, fmt.Sprintf("%08x.entry", crc))
+}
+
+func (a *archive) hasEntry(crc uint32) bool {
+	_, err := os.Stat(a.entryPath(crc))
+	return err == nil
+}
+
+func (a *archive) loadEntry(crc uint32) []byte {
+	e, err := os.ReadFile(a.entryPath(crc))
+	if err != nil || len(e) != entrySize {
+		return nil
+	}
+	return e
+}
+
+func (a *archive) saveEntry(crc uint32, e []byte) error {
+	dir := filepath.Join(a.dir, entryDirName)
+	if _, err := os.Stat(dir); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+		hideFile(dir)
+	}
+	path := a.entryPath(crc)
+	if err := os.WriteFile(path+".part", e, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(path+".part", path)
 }
 
 func listArchive(dir string) error {

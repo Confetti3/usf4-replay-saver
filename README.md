@@ -19,9 +19,11 @@ Windows may warn that the app is unrecognized, because it is not code signed. Ch
 
 ## Watching a saved replay again
 
-Close the game, press **Watch in game** next to a replay, then start the game and open your recent replays. The app puts the replay back among the game's 10 recent matches, in place of the oldest one, which it has already saved. Your next match may replace it again, so save it in the game if you want it to stay there.
+Close the game, press **Watch in game** next to a replay, then start the game and open your recent replays. The app adds it to the game's 10 recent matches, in place of the oldest one (which it has already saved), and updates the game's list so it shows up with its date and fighters. Your next match may replace it again, so save it in the game if you want it to stay there.
 
-This part is new and has not been tested in the game yet. If it does not work for you, please open an issue.
+To do this the app keeps the game's list details for each replay in a hidden `.index` folder inside `USF4 Replays`. Keep that folder with your replays if you move them.
+
+Replays saved by versions before 0.3.0 only have those details if they were still among your 10 recent matches when 0.3.0 first ran. For the others the button is greyed out, but the replay files are kept.
 
 Steam uploads the changed save the next time you start the game. If Steam ever shows a Cloud conflict for USF4 after this, keep the local files.
 
@@ -57,7 +59,7 @@ Run the exe with any of these options to use it without the window:
 
 - The app only reads the game's files, except when you press **Watch in game**.
 - Each file is the game's own replay data, unchanged. The name is the date and time the match was recorded plus a short checksum, which the app uses to skip replays it already has.
-- If more than one Steam account on the PC has played the game, it saves replays from all of them into the same folder.
+- If more than one Steam account on the PC has played the game, it saves replays from all of them into the same folder. Its log lists every save folder it found.
 - Its settings and a small log live in `%LOCALAPPDATA%\usf4-replay-saver`.
 
 ## How the game stores replays
@@ -65,7 +67,8 @@ Run the exe with any of these options to use it without the window:
 The game keeps its saves in Steam Cloud, in the folder above. Every save is a numbered file with a small `N.0` file beside it that holds the CRC-32 of the save.
 
 - Files `300` to `309` hold the last 10 matches. The game cycles through them, rewriting one after each match.
-- Files `0` to `299` hold replays you saved by hand from the Replay Channel. A file called `LIST` indexes them.
+- `replays-swan.dat` is the list the game shows for those 10. Each 125-byte entry, after a 44-byte header, describes one slot: its CRC-32, size, time, date and fighters. The file starts with a CRC-32 of the rest of it.
+- Files `0` to `299` hold replays you saved by hand from the Replay Channel. A file called `LIST` indexes them with entries in the same layout.
 - Every replay starts with `#BRP` and carries the time it was recorded at byte 16.
 
 ## Building

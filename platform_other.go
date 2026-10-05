@@ -53,3 +53,6 @@ const guiAvailable = false
 func runGUI(minimized bool) int { return 1 }
 
 func attachConsole() {}
+
+// hideFile does nothing here; the leading dot already hides the folder.
+func hideFile(string) {}

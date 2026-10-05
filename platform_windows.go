@@ -84,3 +84,11 @@ func hasStdout() bool {
 	t, err := syscall.GetFileType(h)
 	return err == nil && t != 0 // FILE_TYPE_UNKNOWN
 }
+
+func hideFile(path string) {
+	if p, err := syscall.UTF16PtrFromString(path); err == nil {
+		if attrs, err := syscall.GetFileAttributes(p); err == nil {
+			syscall.SetFileAttributes(p, attrs|syscall.FILE_ATTRIBUTE_HIDDEN)
+		}
+	}
+}
