@@ -207,6 +207,48 @@ func TestRestoreRepairsAReplayWrittenWithoutItsEntry(t *testing.T) {
 	}
 }
 
+// After 0.2.0 replaced only a slot's file, the slot holds replay X while its
+// entry still names replay Y. Y's entry must be kept, and survive a restore
+// into that slot.
+func TestOrphanedEntryIsKept(t *testing.T) {
+	if running, _ := gameRunning(); running {
+		t.Skip("SSFIV.exe is running")
+	}
+	g := newFakeGame(t)
+	a, _ := openArchive(filepath.Join(t.TempDir(), "out"))
+	base := time.Date(2026, 10, 3, 19, 0, 0, 0, time.UTC)
+	for i := 0; i < 10; i++ {
+		g.match(ringFirst+i, base.Add(time.Duration(i)*time.Minute), byte(i+1))
+	}
+	y, _ := readSlot(g.dir, ringFirst+2)
+	yEntry := append([]byte(nil), g.entry(ringFirst+2)...)
+	// Archive Y's file only, as 0.2.0 did, with no entry.
+	a.save(y)
+	// 0.2.0 then put an older replay X into slot 302 without the index.
+	x := g.match(ringFirst+9, base.Add(-time.Hour), 0x30) // records X and its entry
+	os.WriteFile(filepath.Join(g.dir, "302"), x, 0o644)
+	writeSum(t, filepath.Join(g.dir, "302"), x)
+
+	if r, err := a.scan([]string{g.dir}, ringFirst, ringLast); err != nil || !a.hasEntry(y.crc) {
+		t.Fatalf("Y's entry not kept (entries %d, err %v)", r.entries, err)
+	}
+	if !bytes.Equal(a.loadEntry(y.crc), yEntry) {
+		t.Fatal("kept entry for Y differs")
+	}
+	// Restoring Y repairs slot 302 with Y's own entry.
+	slot, err := restore(filepath.Join(a.dir, a.known[y.crc]), g.dir, a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := readSlot(g.dir, slot)
+	if got.crc != y.crc || !bytes.Equal(g.entry(slot), yEntry) {
+		t.Fatalf("slot %d not restored to Y", slot)
+	}
+	if _, err := readRingIndex(g.dir); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRestoreRefusesReplaysWithoutEntries(t *testing.T) {
 	g := newFakeGame(t)
 	a, _ := openArchive(filepath.Join(t.TempDir(), "out"))

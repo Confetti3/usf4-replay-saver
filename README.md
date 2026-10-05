@@ -73,7 +73,7 @@ The game keeps its saves in Steam Cloud, in the folder above. Every save is a nu
 
 ## Building
 
-Install Go 1.26 or newer and run `go build -ldflags "-H windowsgui"`. `build.ps1 -Version v0.2.0` makes the release archives. The icon, manifest and version info come from `winres/`; after changing them, run `go run github.com/tc-hib/go-winres@latest make --arch amd64`.
+Install Go 1.26 or newer and run `go build -ldflags "-H windowsgui"`. `build.ps1 -Version v0.3.0` makes the release archives. The icon, manifest and version info come from `winres/`; after changing them, run `go run github.com/tc-hib/go-winres@latest make --arch amd64`.
 
 ## License
 

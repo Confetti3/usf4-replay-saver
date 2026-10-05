@@ -49,13 +49,11 @@ func restore(file string, dir string, a *archive) (int, error) {
 		if _, _, err := a.save(s); err != nil {
 			return 0, fmt.Errorf("could not save slot %d before replacing it: %w", target, err)
 		}
-		if e := ring.entry(target, s.crc); e != nil && !a.hasEntry(s.crc) {
-			if err := a.saveEntry(s.crc, e); err != nil {
-				return 0, fmt.Errorf("could not save slot %d's details before replacing it: %w", target, err)
-			}
-		}
 	} else if !errors.Is(err, os.ErrNotExist) && err != errNotReplay && err != errChecksum {
 		return 0, fmt.Errorf("slot %d could not be read, so it was left alone: %w", target, err)
+	}
+	if _, err := a.keepEntry(ring.raw(target)); err != nil {
+		return 0, fmt.Errorf("could not save slot %d's list details before replacing them: %w", target, err)
 	}
 
 	path := filepath.Join(dir, strconv.Itoa(target))

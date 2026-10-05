@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"hash/crc32"
 	"os"
@@ -114,23 +115,54 @@ func (a *archive) scan(dirs []string, first, last int) (scanResult, error) {
 			if isNew {
 				result.saved = append(result.saved, name)
 			}
-			// The game rewrites the index just after the replay, so an entry
-			// that does not match yet is picked up on a later scan.
+		}
+		// Keep the entry each index slot holds for any replay already saved.
+		// It usually names the slot's own replay; the game rewrites the index
+		// just after the replay, so a lagging entry is picked up next scan.
+		// After an older version of this app replaced only a slot's file, the
+		// entry still names the replay that was there before, which is saved.
+		for n := first; n <= last; n++ {
 			idx := ring
 			if n < ringFirst {
 				idx = saved
 			}
-			if idx != nil && !a.hasEntry(s.crc) {
-				if e := idx.entry(n, s.crc); e != nil && validEntry(e, s.crc, len(s.data)) {
-					if err := a.saveEntry(s.crc, e); err != nil {
-						return result, fmt.Errorf("saving the index entry for slot %d: %w", n, err)
-					}
-					result.entries++
-				}
+			if idx == nil {
+				continue
+			}
+			kept, err := a.keepEntry(idx.raw(n))
+			if err != nil {
+				return result, fmt.Errorf("saving the list entry for slot %d: %w", n, err)
+			}
+			if kept {
+				result.entries++
 			}
 		}
 	}
 	return result, nil
+}
+
+// keepEntry saves an index entry when it names a replay in the archive that
+// has no entry yet.
+func (a *archive) keepEntry(e []byte) (bool, error) {
+	if len(e) != entrySize || e[0] != 1 {
+		return false, nil
+	}
+	crc := binary.LittleEndian.Uint32(e[1:])
+	name := a.nameFor(crc)
+	if name == "" || a.hasEntry(crc) {
+		return false, nil
+	}
+	info, err := os.Stat(filepath.Join(a.dir, name))
+	if err != nil || !validEntry(e, crc, int(info.Size())) {
+		return false, nil
+	}
+	return true, a.saveEntry(crc, e)
+}
+
+func (a *archive) nameFor(crc uint32) string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.known[crc]
 }
 
 func (a *archive) entryPath(crc uint32) string {

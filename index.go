@@ -79,18 +79,26 @@ func readIndex(path string, first, offset int, innerCRC bool) (*replayIndex, err
 	return &replayIndex{path: path, data: data, first: first, offset: offset, count: count, innerCRC: innerCRC}, nil
 }
 
-// entry returns slot n's entry when it is in use and describes the replay
-// with the given CRC, or nil.
-func (idx *replayIndex) entry(n int, crc uint32) []byte {
+// raw returns slot n's entry when it is in use, whatever replay it names.
+func (idx *replayIndex) raw(n int) []byte {
 	i := n - idx.first
 	if i < 0 || i >= idx.count {
 		return nil
 	}
 	e := idx.data[idx.offset+i*entrySize : idx.offset+(i+1)*entrySize]
-	if e[0] != 1 || binary.LittleEndian.Uint32(e[1:]) != crc {
+	if e[0] != 1 {
 		return nil
 	}
 	return append([]byte(nil), e...)
+}
+
+// entry returns slot n's entry when it describes the replay with the given
+// CRC, or nil.
+func (idx *replayIndex) entry(n int, crc uint32) []byte {
+	if e := idx.raw(n); e != nil && binary.LittleEndian.Uint32(e[1:]) == crc {
+		return e
+	}
+	return nil
 }
 
 // put replaces slot n's entry and writes the index back with fresh checksums.
